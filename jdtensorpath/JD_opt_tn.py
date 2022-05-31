@@ -37,8 +37,8 @@ from copy import deepcopy
 import math
 import functools
 
-from tedq.ray_parallel import read_out_ray
-from tedq.ray_parallel import get_ray
+from jdtensorpath.ray_parallel import read_out_ray
+from jdtensorpath.ray_parallel import get_ray
 
 from .gen_trials import generate_trials_parallel
 from .gen_trials import generate_trials
