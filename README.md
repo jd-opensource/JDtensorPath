@@ -18,7 +18,7 @@ pip install -e .
 ```
 
 ## Getting started
-Use JDtensorPath together with [TeD-Q](https://gitee.com/xywu1990/tedq).
+Use JDtensorPath together with [TeD-Q](https://github.com/JDEA-Quantum-Lab/TeD-Q).
 ### Simple example
 #### Define the circuit with TeD-Q framework
 ```
@@ -61,7 +61,7 @@ For more diverse examples of using JDtensorPath together with TeD-Q, please refe
 #### [1D Many Body Localization](/examples/Many_body_Localization_1D.ipynb)
 
 ## Authors
-JDtensorPath is released by JD Explore Academy and is currently maintained by [Xingyao Wu](https://gitee.com/xywu1990). The project is not possible without the efforts made by our [contributors](https://gitee.com/xywu1990/jd-tensor-path/contributors?ref=master).
+JDtensorPath is released by JD Explore Academy and is currently maintained by [Xingyao Wu](https://github.com/xywu1990). The project is not possible without the efforts made by our [contributors](https://github.com/JDEA-Quantum-Lab/jd-tensor-path/graphs/contributors).
 
 ## License
 JDtensorPath is free and open source, released under the Apache License, Version 2.0.
