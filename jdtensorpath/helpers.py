@@ -44,7 +44,7 @@ def count_flops(eq, size_dict):
     r'''
     calculate the flops of matrix product.
     A: m*p
-    B: n*p
+    B: p*n
     C: A*B = m*n
     the flops should be m*n*(2*p-1)
     C: AB = m*p*n

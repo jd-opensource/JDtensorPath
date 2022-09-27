@@ -190,19 +190,34 @@ class JDOptTN:#JD-CoTenGra
         #print("here")
         #return read_out_ray(ids_list)
 
-        #print("num_slices:  ", self.num_slices)
+        print("num_slices:  ", self.num_slices)
         if self.num_slices:
 
-            if self.contract_parallel:
+            if self.contract_parallel == 'GPU':
                 if backend != 'torch':
                     raise ValueError("contract parallel only support pytorch backend!!!")
 
                 # using multiple GPUs for parallelism, like pytorch model parallel method
                 results = self.GPU_parallel_sliced_contract(arrays, backend=backend)
 
+
+
                 # This is for using RAY framework for parallelism
                 # This one only can use for forward operation, can not use backward function
                 #results = self.ray_parallel_sliced_contract(arrays, backend=backend)
+
+
+            elif self.contract_parallel == 'distributed_GPU':
+                if backend != 'torch':
+                    raise ValueError("contract parallel only support pytorch backend!!!")
+
+                results = self.RPC_parallel_sliced_contract_GPU(arrays)
+
+            elif self.contract_parallel == 'distributed_CPU':
+                if backend != 'torch':
+                    raise ValueError("contract parallel only support pytorch backend!!!")
+                    
+                results = self.RPC_parallel_sliced_contract_CPU(arrays)
 
 
             else:
@@ -537,6 +552,102 @@ class JDOptTN:#JD-CoTenGra
         for res in result_list[1:]:
             result += res
         return result
+
+    def RPC_parallel_sliced_contract_CPU(self, arrays):
+        from .distributed import rpc_contract
+        import torch.distributed.rpc as rpc
+        import os
+        world_size = int(os.environ['world_size'])
+        rank = int(os.environ['rank'])
+        if world_size < 2:
+            raise ValueError("world_size must larger than 2!!")
+        if rank != 0:
+            raise ValueError("Master must be in rank 0!!")
+
+        results = []
+        for i in range(self.num_slices):
+
+            # get the corresponding sliced arrays
+            new_arrays = self.get_sliced_arrays(arrays, i)
+
+            # put data into corresponding thread
+            # neglect the master computer
+            which_rank = i%(world_size-1) + 1
+            name = f"worker_{which_rank}"
+            #print(name)
+
+            # do the contraction
+            rref1 = rpc.remote(name, rpc_contract, args=(self.contraction_list, new_arrays))
+            #print(tmpt)
+
+            tmpt = rref1.to_here()
+
+            results.append(tmpt)
+            #if i == 0:
+            #    result = tmpt
+            #else:
+            #    result += tmpt
+        result = sum(results)
+                
+        # rpc.shutdown()
+        #print("cyc")
+        return result
+
+
+
+    def RPC_parallel_sliced_contract_GPU(self, arrays):
+        from .distributed import rpc_contract_GPU
+        import torch.distributed.rpc as rpc
+        import os
+        world_size = int(os.environ['world_size'])
+        rank = int(os.environ['rank'])
+        num_gpus = int(os.environ['num_gpus'])
+        total_size = world_size * num_gpus
+
+        if world_size < 2:
+            raise ValueError("world_size must larger than 2!!")
+        if rank != 0:
+            raise ValueError("Master must be in rank 0!!")
+
+        if self.num_slices > total_size:
+            raise ValueError("Total number of slices must be smaller than total number of GPUs")
+
+        list_arrays = [[] for _ in range(world_size-1)]
+
+        for i in range(self.num_slices):
+
+            # get the corresponding sliced arrays
+            new_arrays = self.get_sliced_arrays(arrays, i)
+
+            which_rank = i%(world_size-1) + 1
+            list_arrays[which_rank - 1].append(new_arrays) # count from 0
+
+        results = []
+        for j in range(1, world_size): # neglect the master computer
+
+            # put data into corresponding thread
+            which_rank = j
+            name = f"worker_{which_rank}"
+            #print(name)
+
+            # do the contraction
+            rref1 = rpc.remote(name, rpc_contract_GPU, args=(self.contraction_list, list_arrays[which_rank - 1]))
+            #print(tmpt)
+
+            tmpt = rref1.to_here()
+
+            results.append(tmpt)
+            #if i == 0:
+            #    result = tmpt
+            #else:
+            #    result += tmpt
+        result = sum(results)
+                
+        # rpc.shutdown()
+        #print("cyc")
+        return result
+
+
 
     # pylint: disable=invalid-name
     def GPU_parallel_sliced_contract(self, arrays, backend = 'torch'):
