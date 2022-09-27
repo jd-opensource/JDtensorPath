@@ -30,7 +30,7 @@ def rpc_contract_GPU(contraction_list, list_arrays):
     host_device = list_arrays[0][0].device
 
     results = []
-    for i in len(list_arrays):
+    for i in range(len(list_arrays)):
         GPU_arrays = [array.to(available_gpus[which_gpu]) for array in list_arrays[i]]
         tmpt = rpc_contract(contraction_list, GPU_arrays)
         tmpt = tmpt.to(host_device)
