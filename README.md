@@ -57,7 +57,7 @@ c = my_compilecircuit(*my_params)
 Please refer to the tutorials and examples of TeD-Q.
 
 ## Tutorial and examples
-For more diverse examples of using JDtensorPath together with TeD-Q, please refer to the following tutorials or our official [documentation](https://tedq.readthedocs.io) website.
+For more diverse examples of using JDtensorPath together with TeD-Q, please refer to the following tutorials or our official [documentation](https://ted-q.readthedocs.io) website.
 #### [1D Many Body Localization](/examples/Many_body_Localization_1D.ipynb)
 
 ## Authors
