@@ -96,7 +96,7 @@ def generate_trials(trial_times, inputs, size_dict, output = None, precut_edges 
 
 # for slicing parts
 
-def find_slice(sliced_sets, target_size, size_dict):
+def find_slice(sliced_sets, output_inds, target_size, size_dict):
     r"""
     Find the sliced_set of tensor network.
 
@@ -114,9 +114,9 @@ def find_slice(sliced_sets, target_size, size_dict):
 
         choice = random.randint(0,1)
         if choice:
-            rm = remove_most_intersect(sets)
+            rm = remove_most_intersect(sets, output_inds)
         else:
-            rm = remove_most_larges(sets)
+            rm = remove_most_larges(sets, output_inds)
 
         removed = removed | rm
 
@@ -134,7 +134,7 @@ def find_slice(sliced_sets, target_size, size_dict):
 
 
 
-def generate_slicing_trials_parallel(num_cpus, trial_times, sliced_sets, target_size, size_dict):
+def generate_slicing_trials_parallel(num_cpus, trial_times, sliced_sets, output_inds, target_size, size_dict):
     r'''
     generate slicing trials parallelly
     '''
@@ -146,7 +146,7 @@ def generate_slicing_trials_parallel(num_cpus, trial_times, sliced_sets, target_
 
     ids_list = []
     for _ in range(trial_times):
-        ids_list.append(find_slice_ray.remote(sliced_sets, target_size, size_dict))
+        ids_list.append(find_slice_ray.remote(sliced_sets, output_inds, target_size, size_dict))
         if len(ids_list) > num_cpu + 3:
             yield read_out_ray(ids_list)
     while len(ids_list) > 0:
@@ -161,18 +161,18 @@ def generate_slicing_trials_parallel(num_cpus, trial_times, sliced_sets, target_
 
 
 
-def generate_slicing_trials(trial_times, sliced_sets, target_size, size_dict):
+def generate_slicing_trials(trial_times, sliced_sets, output_inds, target_size, size_dict):
     r'''
     generate slicing trials.
     '''
 
     for _ in range(trial_times):
-        yield find_slice(sliced_sets, target_size, size_dict)
+        yield find_slice(sliced_sets, output_inds, target_size, size_dict)
 
 
 
 
-def remove_most_intersect(sets):
+def remove_most_intersect(sets, output_inds):
     r'''
     remove indice from width
 
@@ -195,14 +195,21 @@ def remove_most_intersect(sets):
     #print(sets)
     for indices in sets:
         indices_list.extend(list(indices))
+
+    # except output indices    
+    indices_list = [index for index in indices_list if index not in output_inds]
     #print(indices_list)
-    removed = set(max(indices_list, key=indices_list.count))
+    if indices_list:
+        removed = set(max(indices_list, key=indices_list.count))
+    else:
+        # cannot find, put a empty set
+        removed = set()
     for i, _ in enumerate(sets):
         sets[i] = sets[i] - removed
     return removed
 
 
-def remove_most_larges(sets):
+def remove_most_larges(sets, output_inds):
     r'''
     remove indice from top
 
@@ -222,13 +229,22 @@ def remove_most_larges(sets):
 
     '''
     sets.sort(key=lambda indices:-1*len(indices))
-    intersect = sets[0]
+    set_output = set(output_inds)
+    # except output indices
+    intersect = sets[0] - set_output
     removed = set()
     for indices in sets[1:]:
-        intersect = intersect & indices
+        previous_set = set(intersect)
+        # except output indices
+        intersect = intersect & (indices - set_output)
         if len(intersect) == 0:
+            # randomly pip one index
+            # prevent pop from empty set
+            try:
+                removed = set(previous_set.pop())
+            except KeyError:
+                removed = set()
             break
-        removed = intersect
     for i, _ in enumerate(sets):
         sets[i] = sets[i] - set(removed)
     return removed

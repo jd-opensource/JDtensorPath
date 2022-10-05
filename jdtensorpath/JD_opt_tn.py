@@ -82,6 +82,9 @@ class JDOptTN:#JD-CoTenGra
         if precut_edges is None:
             precut_edges = []
 
+        self.scr_arrays = inputs
+        self.scr_output = output
+
         self._size_dict = size_dict
         self.sliced = False
         self.contract_parallel = False
@@ -141,8 +144,7 @@ class JDOptTN:#JD-CoTenGra
         print("log2(size) before slicing: ", math.log2(self.size+1.0e-10))
         print("log10(flops) before removed:   ", math.log10(self.flops+1.0e-10))
 
-        self.scr_arrays = inputs
-        self.scr_output = output
+
         self.contraction_list = []
         self.current_leaves = self.best_trial['current_leaves']
         #self.size = self.binary_tree.get_max_size()#this will be updated if sliced
@@ -228,6 +230,7 @@ class JDOptTN:#JD-CoTenGra
             #print("here ?")
             results = core_contract(self.contraction_list, arrays, backend=backend)
 
+        #print(results)
         return results
 
     def get_sliced_arrays(self, arrays, i):
@@ -364,6 +367,9 @@ class JDOptTN:#JD-CoTenGra
                     order_input.extend(right)
                     result_set = parent_node.outer_indices_set#prevent double count the same idx
 
+                    #print(left, right, result_set)
+                    #print(new_scr_arrays)
+
                     r_set = deepcopy(result_set)
                     #print("r_set  ",r_set)
                     result = []
@@ -398,10 +404,14 @@ class JDOptTN:#JD-CoTenGra
                             left_pos.append(left.index(rm_idx))
                             right_pos.append(right.index(rm_idx))
                         axes = (tuple(left_pos), tuple(right_pos))
+                        #print(right)
+                        #print(axes)
                         einsum_str_or_axes = (axes, )
 
                     parent_node.outer_indices = result
 
+                    # ATTENTION!!! position index2 must be found after tensor_1 has been pop!!
+                    # Since pop(index1) will delete tensor_1 and then affect position of index2!!!
                     index1 = new_scr_arrays.index(left)
                     new_scr_arrays.pop(index1)
                     index2 = new_scr_arrays.index(right)
@@ -419,8 +429,8 @@ class JDOptTN:#JD-CoTenGra
         #print(result)
         if set(self.scr_output) != set(result):
             #print(self.scr_output)
-            #print(set(self.scr_output))
-            print("Error!!! final result indices should be the same as user-specified output")
+            #print(result)
+            raise ValueError("Error!!! final result indices should be the same as user-specified output")
         transpose = tuple(map(result.index, self.scr_output))
         self.contraction_list.append(transpose)
         #print(transpose)
@@ -491,9 +501,9 @@ class JDOptTN:#JD-CoTenGra
             # because CPU is occupied by other kahypar trials
             # if using parallel, then KeyError 'CPU' will occur on ray
             if self.search_parallel and inplace:
-                slice_trials = generate_slicing_trials_parallel(self.search_parallel, repeats, sliced_sets, target_size, self._size_dict)
+                slice_trials = generate_slicing_trials_parallel(self.search_parallel, repeats, sliced_sets, self.scr_output, target_size, self._size_dict)
             else:
-                slice_trials = generate_slicing_trials(repeats, sliced_sets, target_size, self._size_dict)
+                slice_trials = generate_slicing_trials(repeats, sliced_sets, self.scr_output, target_size, self._size_dict)
 
             best_cost = math.inf  # large enough number
             best_trial = None
@@ -580,13 +590,16 @@ class JDOptTN:#JD-CoTenGra
             rref1 = rpc.remote(name, rpc_contract, args=(self.contraction_list, new_arrays))
             #print(tmpt)
 
-            tmpt = rref1.to_here()
+            #tmpt = rref1.to_here() # blocking
 
             results.append(tmpt)
             #if i == 0:
             #    result = tmpt
             #else:
             #    result += tmpt
+
+        #  Use the blocking API to_here() to retrieve the result value locally
+        results = [r.to_here() for r in results]
         result = sum(results)
                 
         # rpc.shutdown()
@@ -634,13 +647,16 @@ class JDOptTN:#JD-CoTenGra
             rref1 = rpc.remote(name, rpc_contract_GPU, args=(self.contraction_list, list_arrays[which_rank - 1]))
             #print(tmpt)
 
-            tmpt = rref1.to_here()
+            #tmpt = rref1.to_here() # blocking
 
             results.append(tmpt)
             #if i == 0:
             #    result = tmpt
             #else:
             #    result += tmpt
+
+        #  Use the blocking API to_here() to retrieve the result value locally
+        results = [r.to_here() for r in results]
         result = sum(results)
                 
         # rpc.shutdown()
@@ -669,6 +685,7 @@ class JDOptTN:#JD-CoTenGra
         #print(type(available_gpus[0]))
         #print(type(host_device))
 
+        results = []
         for i in range(self.num_slices):
 
             # get the corresponding sliced arrays
@@ -683,14 +700,18 @@ class JDOptTN:#JD-CoTenGra
             tmpt = core_contract(self.contraction_list, GPU_arrays, backend = backend)
             #print(tmpt)
 
+            results.append(tmpt)
+
             # transfer the data back to host device
             # all the data must be on the same device and it should be the same as input data device
-            tmpt = tmpt.to(host_device)
+            #tmpt = tmpt.to(host_device)
 
-            if i == 0:
-                result = tmpt
-            else:
-                result += tmpt
+            #if i == 0:
+            #    result = tmpt
+            #else:
+            #    result += tmpt
+        results = [r.to(host_device) for r in results]
+        result = sum(results)
         return result  
 
 
@@ -746,20 +767,25 @@ def core_contract(contraction_list, arrays, backend = 'jax'):
         #print("arrays: ", arrays)
         for contraction in contraction_list[:-1]:#last one is transpose for final result correction
             order_operand, do_einsum, einsum_str_or_axes = contraction
+            # ATTENTION!! MUST pop in order
             temp_operands = [arrays.pop(x) for x in order_operand]
 
+            #print(einsum_str_or_axes[0], temp_operands[0].shape, temp_operands[1].shape)
+            #print(temp_operands)
+            
             if do_einsum:
                 #print(einsum_str_or_axes)
                 #print(temp_operands)
                 result = torch.einsum(einsum_str_or_axes[0], *temp_operands)
             else:
-                #print(einsum_str_or_axes[0], temp_operands[0].shape, temp_operands[1].shape)
-                #print(temp_operands)
                 result = torch.tensordot(*temp_operands, dims=einsum_str_or_axes[0])
 
+            #print(result)
             arrays.append(result)
+            #print(arrays)
 
         final_transpose = contraction_list[-1]
+        #print(arrays[0], final_transpose)
         result = arrays[0].permute(final_transpose)
         return result
 
@@ -791,6 +817,7 @@ def jax_core_contract(contraction_list, arrays):
     
     for contraction in contraction_list[:-1]:#last one is transpose for final result correction
         order_operand, do_einsum, einsum_str_or_axes = contraction
+        # ATTENTION! MUST pop in order!!
         temp_operands = [arrays.pop(x) for x in order_operand]
 
         if do_einsum:

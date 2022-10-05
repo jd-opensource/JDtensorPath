@@ -3,6 +3,7 @@ import torch
 def rpc_contract(contraction_list, arrays):
     for contraction in contraction_list[:-1]:#last one is transpose for final result correction
         order_operand, do_einsum, einsum_str_or_axes = contraction
+        # ATTENTION!! MUST pop in order!!
         temp_operands = [arrays.pop(x) for x in order_operand]
         if do_einsum:
             #print(einsum_str_or_axes)
