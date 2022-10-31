@@ -192,7 +192,7 @@ class JDOptTN:#JD-CoTenGra
         #print("here")
         #return read_out_ray(ids_list)
 
-        print("num_slices:  ", self.num_slices)
+        #print("num_slices:  ", self.num_slices)
         if self.num_slices:
 
             if self.contract_parallel == 'GPU':
@@ -592,7 +592,7 @@ class JDOptTN:#JD-CoTenGra
 
             #tmpt = rref1.to_here() # blocking
 
-            results.append(tmpt)
+            results.append(rref1)
             #if i == 0:
             #    result = tmpt
             #else:
