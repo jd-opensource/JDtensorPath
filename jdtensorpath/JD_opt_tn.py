@@ -46,6 +46,9 @@ from .gen_trials import generate_slicing_trials
 from .gen_trials import generate_slicing_trials_parallel
 from .helpers import dec_to_bin, compute_size_by_dict, to_dynamic_base
 
+
+from torch.distributed.rpc import RRef
+
 #RAY = get_ray()
 
 _EINSUM_SYMBOLS_BASE = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -223,6 +226,7 @@ class JDOptTN:#JD-CoTenGra
 
 
             else:
+                #print("should be here")
                 results = self.single_thread_sliced_contract(arrays, backend=backend)
 
 
@@ -564,6 +568,7 @@ class JDOptTN:#JD-CoTenGra
         return result
 
     def RPC_parallel_sliced_contract_CPU(self, arrays):
+        #print("using RPC_parallel_sliced_contract_CPU")
         from .distributed import rpc_contract
         import torch.distributed.rpc as rpc
         import os
@@ -575,31 +580,87 @@ class JDOptTN:#JD-CoTenGra
             raise ValueError("Master must be in rank 0!!")
 
         results = []
+        # print(' ')
+        # print(' ')
+        # s_arrs = []
+        # r_arrs = []
+        # for i in range(self.num_slices):
+        #     sliced_arrays = self.get_sliced_arrays(arrays, i)
+        #     s_arrs.append(sliced_arrays)
+        #     #r_arrays = RRef(sliced_arrays)
+        #     r_arrays = [RRef(arr) for arr in sliced_arrays]
+        #     r_arrays = tuple(arrays)
+        #     r_arrs.append(r_arrays)
+
         for i in range(self.num_slices):
 
             # get the corresponding sliced arrays
-            new_arrays = self.get_sliced_arrays(arrays, i)
+            sliced_arrays = self.get_sliced_arrays(arrays, i)
+            #new_arrays = list(sliced_arrays)
 
             # put data into corresponding thread
-            # neglect the master computer
-            which_rank = i%(world_size-1) + 1
-            name = f"worker_{which_rank}"
+            # neglect the master computer  i%(world_size-1) + 1
+            which_rank = i%(world_size)
+            if which_rank == 0:
+                name = f"master"
+            else:
+                name = f"worker_{which_rank}"
             #print(name)
+            #print(self.contraction_list[:10])
+
+            #name = f"master"
+
+            #r_arrays = RRef(new_arrays)
 
             # do the contraction
-            rref1 = rpc.remote(name, rpc_contract, args=(self.contraction_list, new_arrays))
+            rref1 = rpc.remote(name, rpc_contract, args=(self.contraction_list, sliced_arrays))
+            #print(type(rref1))
+            #tmpt = rref1.to_here()
+            #print(type(tmpt))
+            #print(" ")
             #print(tmpt)
+            results.append(rref1)
+
+            # l3 = [a - b for a, b in zip(tmpt, sliced_arrays)]
+            # l4 = [c**2 for c in l3]
+            # l5 = [d.any() for d in l4]
+            # print(any(l5))
+            # for j in range(len(l5)):
+            #     if l5[j]:
+            #         print(j)
+            #         print(len(arrays))
+            #         print(tmpt[j])
+            #         #print(s_arrs[i][j])
+            #         #print(r_arrs[i][j])
+            #         print(sliced_arrays[j])
+            #         print(" ")
+
+            #test = rpc_contract(self.contraction_list, sliced_arrays)
+            #print(test)
+            #print(" ")
+
+            #l6 = [a - b for a, b in zip(test, new_arrays)]
+            #l7 = [c**2 for c in l6]
+            #l8 = [d.any() for d in l7]
+            #print(l6[-1], l7[-1], l8[-1])
+            #print(any(l8))
+            #return test
+
 
             #tmpt = rref1.to_here() # blocking
 
-            results.append(rref1)
+            #results.append(rref1.to_here())
             #if i == 0:
             #    result = tmpt
             #else:
             #    result += tmpt
 
+            #tmpt = rpc_contract(self.contraction_list, new_arrays)
+            #results.append(test)
+
         #  Use the blocking API to_here() to retrieve the result value locally
         results = [r.to_here() for r in results]
+        #print(results)
         result = sum(results)
                 
         # rpc.shutdown()
@@ -726,7 +787,7 @@ class JDOptTN:#JD-CoTenGra
             new_arrays = self.get_sliced_arrays(arrays, i)
             #print([ix.shape for ix in new_arrays])
             tmpt = core_contract(self.contraction_list, new_arrays, backend = backend)
-            #print(tmpt)
+            #print("cyc: ", tmpt)
             if i == 0:
                 result = tmpt
             else:

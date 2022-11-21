@@ -1,6 +1,8 @@
 import torch
 
 def rpc_contract(contraction_list, arrays):
+    #return arrays
+
     for contraction in contraction_list[:-1]:#last one is transpose for final result correction
         order_operand, do_einsum, einsum_str_or_axes = contraction
         # ATTENTION!! MUST pop in order!!
@@ -14,8 +16,13 @@ def rpc_contract(contraction_list, arrays):
             #print(temp_operands)
             result = torch.tensordot(*temp_operands, dims=einsum_str_or_axes[0])
         arrays.append(result)
+        #if fuck == 50:
+        #    print("wyn: ", arrays[-1])
+        #fuck += 1
+    #print("hxj: ", arrays[-1])
     final_transpose = contraction_list[-1]
     result = arrays[0].permute(final_transpose)
+    #print("cyc: ", result)
     return result
 
 def rpc_contract_GPU(contraction_list, list_arrays):
@@ -34,9 +41,9 @@ def rpc_contract_GPU(contraction_list, list_arrays):
     for i in range(len(list_arrays)):
         GPU_arrays = [array.to(available_gpus[i]) for array in list_arrays[i]]
         tmpt = rpc_contract(contraction_list, GPU_arrays)
-        tmpt = tmpt.to(host_device)
+        #tmpt = tmpt.to(host_device)
         results.append(tmpt)
 
-    result = sum(results)
+    result = sum([tmpt.to(host_device) for tmpt in results])
 
     return result

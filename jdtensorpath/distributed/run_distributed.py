@@ -11,7 +11,7 @@ from jdtensorpath.distributed import rpc_contract, rpc_contract_GPU
 
 
 class run_distributed:
-    def __init__(self, world_size, rank, num_gpus=0, master_addr='172.17.224.178', master_port='8119'):#master_addr='172.17.224.178', master_port='8119'
+    def __init__(self, world_size, rank, num_gpus=0, master_addr='localhost', master_port='5678'):#master_addr='172.17.224.178', master_port='8119'
 
         os.environ['MASTER_ADDR'] = master_addr
         os.environ['MASTER_PORT'] = master_port
