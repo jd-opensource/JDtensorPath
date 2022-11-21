@@ -29,7 +29,7 @@ class Observer:
         results = []
         for i in range(4):
             gpu_params = parameters.to(available_gpus[i])
-            tmpt = self.cost_func(parameters)
+            tmpt = self.cost_func(gpu_params)
             results.append(tmpt)
 
         return sum([tmpt.to(host_device) for tmpt in results])
