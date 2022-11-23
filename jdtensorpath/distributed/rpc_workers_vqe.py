@@ -5,6 +5,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description="Parameter-Server RPC based training")
     parser.add_argument(
+        "--path",
+        type=int,
+        default=None,
+        help="""Path to your distributed .py file""")
+    parser.add_argument(
         "--world_size",
         type=int,
         default=None,
