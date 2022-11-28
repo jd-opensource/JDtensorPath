@@ -1,4 +1,5 @@
 import torch
+import warnings
 
 def rpc_contract(contraction_list, arrays):
     #return arrays
@@ -32,14 +33,16 @@ def rpc_contract_GPU(contraction_list, list_arrays):
         raise ValueError("There's no GPU in this computer! please use cpu mode!")
 
     if len(list_arrays) > gpus_count:
-        raise ValueError("Number of GPUs is smaller than number of assigned slices!!")
+        warnings.warn("Number of GPUs is smaller than number of assigned slices!!")
+        # raise ValueError("Number of GPUs is smaller than number of assigned slices!!")
 
     available_gpus = [torch.device('cuda:'+''.join(str(i))) for i in range(gpus_count)]  # pylint: disable=no-member
     host_device = list_arrays[0][0].device
 
     results = []
     for i in range(len(list_arrays)):
-        GPU_arrays = [array.to(available_gpus[i]) for array in list_arrays[i]]
+        which_gpu = i%gpus_count
+        GPU_arrays = [array.to(available_gpus[which_gpu]) for array in list_arrays[i]]
         tmpt = rpc_contract(contraction_list, GPU_arrays)
         #tmpt = tmpt.to(host_device)
         results.append(tmpt)

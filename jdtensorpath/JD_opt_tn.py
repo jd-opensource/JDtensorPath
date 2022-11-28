@@ -36,6 +36,7 @@ Jingdong Optimizer for Tensor Network(JDOptTN) is a module to find the optimal c
 from copy import deepcopy
 import math
 import functools
+import warnings
 
 from jdtensorpath.ray_parallel import read_out_ray
 from jdtensorpath.ray_parallel import get_ray
@@ -579,7 +580,12 @@ class JDOptTN:#JD-CoTenGra
         if rank != 0:
             raise ValueError("Master must be in rank 0!!")
 
-        results = []
+        total_size = world_size - 1
+
+        if self.num_slices > total_size:
+            warnings.warn("Total number of slices is larger than total number of assigned CPUs")
+
+        
         # print(' ')
         # print(' ')
         # s_arrs = []
@@ -592,6 +598,8 @@ class JDOptTN:#JD-CoTenGra
         #     r_arrays = tuple(arrays)
         #     r_arrs.append(r_arrays)
 
+        results = []
+        remote_results = []
         for i in range(self.num_slices):
 
             # get the corresponding sliced arrays
@@ -599,12 +607,9 @@ class JDOptTN:#JD-CoTenGra
             #new_arrays = list(sliced_arrays)
 
             # put data into corresponding thread
-            # neglect the master computer  i%(world_size-1) + 1
-            which_rank = i%(world_size)
-            if which_rank == 0:
-                name = f"master"
-            else:
-                name = f"worker_{which_rank}"
+            # neglect the master computer  
+            which_rank = i%(world_size-1) + 1
+            name = f"worker_{which_rank}"
             #print(name)
             #print(self.contraction_list[:10])
 
@@ -619,7 +624,13 @@ class JDOptTN:#JD-CoTenGra
             #print(type(tmpt))
             #print(" ")
             #print(tmpt)
-            results.append(rref1)
+            remote_results.append(rref1)
+
+            # make a sychronization so that the data in the same thread will not be conflicted.
+            # Each thread must finish its calculation before new data assigned to it.
+            if which_rank == world_size-1:
+                results.extend([r.to_here() for r in remote_results])
+                remote_results = [] # clean it since the results have been transfer back.
 
             # l3 = [a - b for a, b in zip(tmpt, sliced_arrays)]
             # l4 = [c**2 for c in l3]
@@ -659,7 +670,8 @@ class JDOptTN:#JD-CoTenGra
             #results.append(test)
 
         #  Use the blocking API to_here() to retrieve the result value locally
-        results = [r.to_here() for r in results]
+        results.extend([r.to_here() for r in remote_results])
+
         #print(results)
         result = sum(results)
                 
@@ -675,8 +687,11 @@ class JDOptTN:#JD-CoTenGra
         import os
         world_size = int(os.environ['world_size'])
         rank = int(os.environ['rank'])
-        num_gpus = int(os.environ['num_gpus'])
-        total_size = world_size * num_gpus
+        gpus_per_cpu = int(os.environ['gpus_per_cpu'])
+        total_size = (world_size-1) * gpus_per_cpu # master node is not supposed to be used for calculation.
+        
+        if total_size == 0:
+            raise ValueError("No GPU is assigned for distributed_GPU parallelism!!")
 
         if world_size < 2:
             raise ValueError("world_size must larger than 2!!")
@@ -684,7 +699,7 @@ class JDOptTN:#JD-CoTenGra
             raise ValueError("Master must be in rank 0!!")
 
         if self.num_slices > total_size:
-            raise ValueError("Total number of slices must be smaller than total number of GPUs")
+            warnings.warn("Total number of slices is larger than total number of GPUs")
 
         list_arrays = [[] for _ in range(world_size-1)]
 
