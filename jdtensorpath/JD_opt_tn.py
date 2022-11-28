@@ -725,7 +725,7 @@ class JDOptTN:#JD-CoTenGra
 
             #tmpt = rref1.to_here() # blocking
 
-            results.append(tmpt)
+            results.append(rref1)
             #if i == 0:
             #    result = tmpt
             #else:

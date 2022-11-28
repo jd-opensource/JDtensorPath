@@ -105,7 +105,7 @@ class run_distributed:
         self._cpus_per_node = cpus_per_node
 
         # master node is not supposed to be used for calculation.
-        self._world_size = (self._num_nodes-1) * self._cpus_per_node + 1
+        self._world_size = self._num_nodes * self._cpus_per_node + 1
 
         os.environ['MASTER_ADDR'] = master_addr
         os.environ['MASTER_PORT'] = master_port
