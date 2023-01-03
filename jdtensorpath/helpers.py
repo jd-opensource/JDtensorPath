@@ -160,3 +160,22 @@ def prod(seq):
     for x in seq:
         ret *= x
     return ret
+
+
+def alter(file, dict_str_old_new):
+    """
+    Replace the string inside a file
+    :param file: file name
+    :param dict_str_old_new: dict of old str to new str
+    
+    """
+    file_data = ""
+    with open(file, "r", encoding="utf-8") as f:
+        for line in f:
+            for old_str, new_str in dict_str_old_new.items():
+                if old_str in line:
+                    #print(line)
+                    line = new_str
+            file_data += line
+    with open(file,"w",encoding="utf-8") as f:
+        f.write(file_data)

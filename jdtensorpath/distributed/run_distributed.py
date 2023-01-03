@@ -6,6 +6,7 @@ from torch.distributed.rpc import RRef
 import os
 import torch
 from jdtensorpath.distributed import rpc_contract, rpc_contract_GPU
+from .helpers import alter
 import itertools
 import warnings
 
@@ -123,6 +124,10 @@ class run_distributed:
             raise ValueError("world_size must larger than or equal to 2!!")
 
         if self._rank == 0:
+            slurm_job_file = self.generate_slurm_job_file()
+            f=os.popen("sbatch slurm_job_file")
+            print(f.read())
+
             rpc.init_rpc("master", rank=0, world_size=self._world_size)
         else:
             name = f"worker_{rank}"
@@ -130,6 +135,23 @@ class run_distributed:
         # print("here1.2")
 
     
+    def generate_slurm_job_file(self):
+        slurm_job_file = "/raid/slurm-for-quantum/home/qc01/cyc/TeD-Q/tedq/distributed_worker/cycslurmjob.sh"
+        dict_str_old_new = dict()
+
+        str_num_nodes = "#SBATCH --nodes=" + str(self._num_nodes) + "\n"
+        dict_str_old_new["#SBATCH --nodes="] = str_num_nodes
+
+        str_cpus_per_node = "#SBATCH --ntasks-per-node=" + str(self._cpus_per_node) + "\n"
+        dict_str_old_new["#SBATCH --ntasks-per-node="] = str_cpus_per_node
+
+        str_gpus_per_cpu = "#SBATCH --gres=gpu:" + str(self._gpus_per_cpu) + "\n"
+        dict_str_old_new["#SBATCH --gres=gpu:"] = str_gpus_per_cpu
+    
+        alter(slurm_job_file, dict_str_old_new)
+
+        return slurm_job_file
+
     def shutdown(self):
         rpc.shutdown()
 
