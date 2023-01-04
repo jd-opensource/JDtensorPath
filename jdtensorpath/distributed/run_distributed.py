@@ -105,6 +105,8 @@ class run_distributed:
         self._rank = rank
         self._gpus_per_cpu = gpus_per_cpu
         self._cpus_per_node = cpus_per_node
+        self._master_addr = master_addr
+        self._master_port = master_port
 
         # master node is not supposed to be used for calculation.
         self._world_size = self._num_nodes * self._cpus_per_node + 1
@@ -190,8 +192,8 @@ class run_distributed:
         str_srun += "srun python rpc_workers.py --num_nodes " + str(self._num_nodes)
         str_srun += " --rank $rank --gpus_per_cpu " + str(self._gpus_per_cpu)
         str_srun += " --cpus_per_node " + str(self._cpus_per_node)
-        str_srun += " --master_addr " + master_addr
-        str_srun += " --master_port " + master_port + "\n"
+        str_srun += " --master_addr " + self._master_addr
+        str_srun += " --master_port " + self._master_port + "\n"
         
         file_data = ""
         file_data += "#!/bin/bash\n"
