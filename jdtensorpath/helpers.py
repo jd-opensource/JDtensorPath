@@ -162,6 +162,7 @@ def prod(seq):
     return ret
 
 
+# depreciated
 def alter(file, dict_str_old_new):
     """
     Replace the string inside a file
