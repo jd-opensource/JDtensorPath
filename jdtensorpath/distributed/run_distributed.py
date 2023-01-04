@@ -4,6 +4,7 @@ from torch import optim
 from torch.distributed.optim import DistributedOptimizer
 from torch.distributed.rpc import RRef
 import os
+from tempfileNamed import TemporaryFile
 import torch
 from jdtensorpath.distributed import rpc_contract, rpc_contract_GPU
 from .helpers import alter
@@ -125,8 +126,14 @@ class run_distributed:
 
         if self._rank == 0:
             slurm_job_file = self.generate_slurm_job_file()
-            f=os.popen("sbatch slurm_job_file")
+            str_sbatch_cmd = "sbatch " + slurm_job_file.name
+            try:
+                f=os.popen(str_sbatch_cmd)
             print(f.read())
+
+            print(slurm_job_file.read())
+
+            slurm_job_file.close()
 
             rpc.init_rpc("master", rank=0, world_size=self._world_size)
         else:
@@ -135,22 +142,48 @@ class run_distributed:
         # print("here1.2")
 
     
+    # def generate_slurm_job_file(self):
+    #     slurm_job_file = "/raid/slurm-for-quantum/home/qc01/cyc/TeD-Q/tedq/distributed_worker/cycslurmjob.sh"
+    #     dict_str_old_new = dict()
+
+    #     str_num_nodes = "#SBATCH --nodes=" + str(self._num_nodes) + "\n"
+    #     dict_str_old_new["#SBATCH --nodes="] = str_num_nodes
+
+    #     str_cpus_per_node = "#SBATCH --ntasks-per-node=" + str(self._cpus_per_node) + "\n"
+    #     dict_str_old_new["#SBATCH --ntasks-per-node="] = str_cpus_per_node
+
+    #     str_gpus_per_cpu = "#SBATCH --gres=gpu:" + str(self._gpus_per_cpu) + "\n"
+    #     dict_str_old_new["#SBATCH --gres=gpu:"] = str_gpus_per_cpu
+    
+    #     alter(slurm_job_file, dict_str_old_new)
+
+    #     return slurm_job_file
+
     def generate_slurm_job_file(self):
-        slurm_job_file = "/raid/slurm-for-quantum/home/qc01/cyc/TeD-Q/tedq/distributed_worker/cycslurmjob.sh"
-        dict_str_old_new = dict()
 
         str_num_nodes = "#SBATCH --nodes=" + str(self._num_nodes) + "\n"
-        dict_str_old_new["#SBATCH --nodes="] = str_num_nodes
-
         str_cpus_per_node = "#SBATCH --ntasks-per-node=" + str(self._cpus_per_node) + "\n"
-        dict_str_old_new["#SBATCH --ntasks-per-node="] = str_cpus_per_node
-
         str_gpus_per_cpu = "#SBATCH --gres=gpu:" + str(self._gpus_per_cpu) + "\n"
-        dict_str_old_new["#SBATCH --gres=gpu:"] = str_gpus_per_cpu
-    
-        alter(slurm_job_file, dict_str_old_new)
+        
+        file_data = ""
+        file_data += "#!/bin/bash\n"
+        file_data += "#SBATCH -o job.%j.out\n"
+        file_data += "#SBATCH --partition=p40\n"
+        file_data += "#SBATCH -J myFirstJob\n"
+        file_data += str_num_nodes
+        file_data += str_cpus_per_node
+        file_data += str_gpus_per_cpu
+        file_data += "cd /raid/slurm-for-quantum/home/qc01/cyc/TeD-Q/tedq/distributed_worker/\n"
+        file_data += "rank=$(($SLURM_PROCID+1))\n"
+        file_data += "srun python rpc_workers.py --num_nodes 2 --rank $rank --gpus_per_cpu 4 --cpus_per_node 1 --master_addr 172.17.224.177\n"
 
-        return slurm_job_file
+
+        fp = NamedTemporaryFile(mode='w+t', encoding="utf-8", newline='\n') # 创建一个临时文件
+        fp.write(file_data)     # 向该零时文件中写入一些数据
+
+        return fp
+
+
 
     def shutdown(self):
         rpc.shutdown()
