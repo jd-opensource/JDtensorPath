@@ -133,6 +133,8 @@ class run_distributed:
                 print(e)
                 print(f"Error happen in slurm!!!, please use squeue to find out job ID and then use scancel 'job ID' to cancel that slurm job!!!")
                 print(f.read())
+                # rais the exception and stop the program
+                raise Exception("stop the program")
             else:
                 slurm_job_id = f.read().split("Submitted batch job ")[1]
                 self._slurm_job_id = slurm_job_id
@@ -145,7 +147,17 @@ class run_distributed:
 
             slurm_job_file.close()
 
-            rpc.init_rpc("master", rank=0, world_size=self._world_size)
+            try:
+                rpc.init_rpc("master", rank=0, world_size=self._world_size)
+            except Exception as e:
+                print(e)
+                print(f"RPC initialization unsuccessfully! cancel the slurm job and quit the program!")
+                # cancel the job
+                str_scancel_cmd = "scancel " + self._slurm_job_id
+                os.popen(str_sbatch_cmd)
+                # rais the exception and stop the program
+                raise Exception("stop the program")
+
         else:
             name = f"worker_{rank}"
             rpc.init_rpc(name, rank=self._rank, world_size=self._world_size)
@@ -205,6 +217,10 @@ class run_distributed:
     def shutdown(self):
         rpc.shutdown()
 
+        # make sure slurm job is finished!
+        str_scancel_cmd = "scancel " + self._slurm_job_id
+        os.popen(str_sbatch_cmd)
+
 
 
 
@@ -212,6 +228,18 @@ class run_distributed_circuit_parallel(run_distributed):
 
 
     def set_circuit(self, quantum_circuit):
+        try:
+            self._set_circuit(quantum_circuit)
+        except Exception as e:
+            print(e)
+            print(f"set_circuit unsuccessfully! cancel the slurm job and quit the program!")
+            # cancel the job
+            str_scancel_cmd = "scancel " + self._slurm_job_id
+            os.popen(str_sbatch_cmd)
+            # rais the exception and stop the program
+            raise Exception("stop the program")
+
+    def _set_circuit(self, quantum_circuit):
 
         self._calculation_mode = quantum_circuit.calculation_mode
 
@@ -275,8 +303,21 @@ class run_distributed_circuit_parallel(run_distributed):
         for fut in futs:
             fut.wait()
 
-
     def set_cost_func(self, cost_func, **kwargs):
+
+        try:
+            self._set_cost_func(cost_func, **kwargs)
+        except Exception as e:
+            print(e)
+            print(f"set_cost_func unsuccessfully! cancel the slurm job and quit the program!")
+            # cancel the job
+            str_scancel_cmd = "scancel " + self._slurm_job_id
+            os.popen(str_sbatch_cmd)
+            # rais the exception and stop the program
+            raise Exception("stop the program")
+
+
+    def _set_cost_func(self, cost_func, **kwargs):
 
         if self._rank != 0:
             raise ValueError("Only master node need to set_cost_func!!")
@@ -288,9 +329,23 @@ class run_distributed_circuit_parallel(run_distributed):
 
         self.cost_func = cost_func
 
+
+
+    def __call__(self, quantum_parameters, cost_parameters=None):
+        try:
+            self._call_func(quantum_parameters, cost_parameters)
+        except Exception as e:
+            print(e)
+            print(f"call_func unsuccessfully! cancel the slurm job and quit the program!")
+            # cancel the job
+            str_scancel_cmd = "scancel " + self._slurm_job_id
+            os.popen(str_sbatch_cmd)
+            # rais the exception and stop the program
+            raise Exception("stop the program")
+
     
     # Notice, parameters must be in CPU since pytorch distributed do not support cuda tensor copy yet!!
-    def __call__(self, quantum_parameters, cost_parameters=None):
+    def _call_func(self, quantum_parameters, cost_parameters=None):
         '''
         quantum_parameters: list of tuple
         cost_parameters: quantum_parameters
@@ -420,8 +475,21 @@ class run_distributed_circuit_parallel(run_distributed):
 
 class run_distributed_slicing_parallel(run_distributed):
 
-
     def set_cost_func(self, cost_func, **kwargs):
+
+        try:
+            self._set_cost_func(cost_func, **kwargs)
+        except Exception as e:
+            print(e)
+            print(f"set_cost_func unsuccessfully! cancel the slurm job and quit the program!")
+            # cancel the job
+            str_scancel_cmd = "scancel " + self._slurm_job_id
+            os.popen(str_sbatch_cmd)
+            # rais the exception and stop the program
+            raise Exception("stop the program")
+
+
+    def _set_cost_func(self, cost_func, **kwargs):
 
         if self._rank != 0:
             raise ValueError("Only master node need to set_circuit!!")
@@ -448,9 +516,20 @@ class run_distributed_slicing_parallel(run_distributed):
             pass
 
 
+    def __call__(self, *parameters):
+        try:
+            self._call_func(*parameters)
+        except Exception as e:
+            print(e)
+            print(f"call_func unsuccessfully! cancel the slurm job and quit the program!")
+            # cancel the job
+            str_scancel_cmd = "scancel " + self._slurm_job_id
+            os.popen(str_sbatch_cmd)
+            # rais the exception and stop the program
+            raise Exception("stop the program")
     
     # Notice, parameters must be in CPU since pytorch distributed do not support cuda tensor copy yet!!
-    def __call__(self, *parameters):
+    def _call_func(self, *parameters):
         if self._rank != 0:
             raise ValueError("Only master node need to call!!")
         #print(parameters)
