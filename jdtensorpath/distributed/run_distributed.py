@@ -178,11 +178,12 @@ class run_distributed:
         str_srun += "srun python rpc_workers.py --num_nodes " + str(self._num_nodes)
         str_srun += " --rank $rank --gpus_per_cpu " + str(self._gpus_per_cpu)
         str_srun += " --cpus_per_node " + str(self._cpus_per_node)
-        str_srun += " --master_addr " + master_addr + '\n'
+        str_srun += " --master_addr " + master_addr
+        str_srun += " --master_port " + master_port + "\n"
         
         file_data = ""
         file_data += "#!/bin/bash\n"
-        file_data += "#SBATCH -o job."srun python rpc_workers.py --num_nodes %j.out\n"
+        file_data += "#SBATCH -o job.%j.out\n"
         file_data += "#SBATCH --partition=p40\n"
         file_data += "#SBATCH -J myFirstJob\n"
         file_data += str_num_nodes
