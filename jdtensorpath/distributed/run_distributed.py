@@ -121,7 +121,7 @@ class run_distributed:
         os.environ['world_size'] = str(self._world_size)
 
         # print("here1.1")
-        # print(self._world_size, self._rank)
+        print(self._world_size, self._rank)
 
         if self._world_size < 2:
             raise ValueError("world_size must larger than or equal to 2!!")
@@ -141,7 +141,7 @@ class run_distributed:
                 slurm_job_id = f.read().split("Submitted batch job ")[1]
                 self._slurm_job_id = slurm_job_id
                 print(f"slurm job id is: ", self._slurm_job_id)
-                print(f"If program exit unexpectlly, please use'squeue' to find out job ID and then use 'scancel <job ID>' to cancel that slurm job!!!")
+                print(f"If program exit unexpectlly, please use 'squeue' to find out job ID and then use 'scancel <job ID>' to cancel that slurm job!!!")
 
 
 
@@ -159,6 +159,7 @@ class run_distributed:
                 os.popen(str_sbatch_cmd)
                 # rais the exception and stop the program
                 raise Exception("stop the program")
+            print("RPC initialization successfully!")
 
         else:
             name = f"worker_{rank}"
@@ -221,7 +222,7 @@ class run_distributed:
 
         # make sure slurm job is finished!
         str_scancel_cmd = "scancel " + self._slurm_job_id
-        os.popen(str_sbatch_cmd)
+        os.popen(str_scancel_cmd)
 
 
 
@@ -335,7 +336,7 @@ class run_distributed_circuit_parallel(run_distributed):
 
     def __call__(self, quantum_parameters, cost_parameters=None):
         try:
-            self._call_func(quantum_parameters, cost_parameters)
+            results = self._call_func(quantum_parameters, cost_parameters)
         except Exception as e:
             print(e)
             print(f"call_func unsuccessfully! cancel the slurm job and quit the program!")
@@ -344,6 +345,8 @@ class run_distributed_circuit_parallel(run_distributed):
             os.popen(str_sbatch_cmd)
             # rais the exception and stop the program
             raise Exception("stop the program")
+
+        return results
 
     
     # Notice, parameters must be in CPU since pytorch distributed do not support cuda tensor copy yet!!
@@ -520,7 +523,7 @@ class run_distributed_slicing_parallel(run_distributed):
 
     def __call__(self, *parameters):
         try:
-            self._call_func(*parameters)
+            results = self._call_func(*parameters)
         except Exception as e:
             print(e)
             print(f"call_func unsuccessfully! cancel the slurm job and quit the program!")
@@ -529,6 +532,8 @@ class run_distributed_slicing_parallel(run_distributed):
             os.popen(str_sbatch_cmd)
             # rais the exception and stop the program
             raise Exception("stop the program")
+
+        return results
     
     # Notice, parameters must be in CPU since pytorch distributed do not support cuda tensor copy yet!!
     def _call_func(self, *parameters):
