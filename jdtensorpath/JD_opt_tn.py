@@ -178,6 +178,9 @@ class JDOptTN:#JD-CoTenGra
             if ray.is_initialized():
                 raise ValueError("ray should be shutdown!!")
 
+            # clean the cache, so that the shutdown ray will not be used
+            get_ray.cache_clear()
+
 
 
     
